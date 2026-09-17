@@ -355,7 +355,7 @@
 </style>
 </head>
 <body>
-<div id="bannerAtualizacao" style="display:none; position:fixed; top:0; left:0; right:0; z-index:100; background:var(--signal); color:#1B1F1D; text-align:center; padding:12px; font-weight:700; font-size:14px; cursor:pointer;" onclick="location.reload()">
+<div id="bannerAtualizacao" style="display:none; position:fixed; top:0; left:0; right:0; z-index:100; background:var(--signal); color:#1B1F1D; text-align:center; padding:12px; font-weight:700; font-size:14px; cursor:pointer;" onclick="atualizarApp()">
   🔄 Nova atualização disponível — toque para atualizar
 </div>
 <div id="roleGate">
@@ -812,7 +812,7 @@
 </script>
 
 <script>
-const APP_VERSION = "2026-09-17-07";
+const APP_VERSION = "2026-09-17-08";
 const urlParams = new URLSearchParams(window.location.search);
 let tenantId = (urlParams.get('loja') || '').trim().toLowerCase().replace(/[^a-z0-9-]/g,'') || null;
 const isDevMode = urlParams.get('dev') === '1';
@@ -2110,6 +2110,11 @@ async function checarNovaVersao(){
       document.getElementById('bannerAtualizacao').style.display = 'block';
     }
   }catch(e){ /* sem sinal ou version.json ainda não existe: ignora */ }
+}
+function atualizarApp(){
+  const url = new URL(location.href);
+  url.searchParams.set('_v', Date.now());
+  location.href = url.toString();
 }
 checarNovaVersao();
 setInterval(checarNovaVersao, 3*60*1000);
