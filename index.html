@@ -377,7 +377,7 @@
     </div>
 
     <div id="stepTesteVencido" style="display:none;">
-      <p>⏰ O período de teste gratuito de 7 dias desta empresa acabou.<br>Entre em contato com o administrador do sistema para continuar usando.</p>
+      <p>⏰ O contrato desta empresa venceu.<br>Entre em contato com o administrador do sistema para renovar.</p>
     </div>
 
     <div id="stepLojaNaoEncontrada" style="display:none;">
@@ -399,7 +399,14 @@
       <input type="text" id="inpNovaEmpresaNome" placeholder="Ex: Pizzaria do João">
       <label>Identificador do link (sem espaços)</label>
       <input type="text" id="inpNovaEmpresaSlug" placeholder="Ex: pizzaria-do-joao">
-      <label style="margin-top:12px;"><input type="checkbox" id="chkTeste7dias" style="width:auto; margin-right:6px;">Período de teste de 7 dias</label>
+      <label style="margin-top:12px;">Data de vencimento do contrato (opcional)</label>
+      <input type="date" id="inpVencimento">
+      <div class="row" style="margin-top:6px;">
+        <button type="button" class="btn-small" onclick="definirVencimentoRapido('', 7)">+7 dias</button>
+        <button type="button" class="btn-small" onclick="definirVencimentoRapido('', 30)">+1 mês</button>
+        <button type="button" class="btn-small" onclick="definirVencimentoRapido('', 365)">+1 ano</button>
+      </div>
+      <div class="hint">Deixe em branco pra acesso permanente. Dá pra mudar essa data depois, a qualquer momento.</div>
       <button class="btn-primary" onclick="criarTenant('')">Criar empresa</button>
 
       <h2 class="section-title">Administradores</h2>
@@ -424,7 +431,14 @@
       <input type="text" id="inpNovaEmpresaNomeAdmin" placeholder="Ex: Pizzaria do João">
       <label>Identificador do link (sem espaços)</label>
       <input type="text" id="inpNovaEmpresaSlugAdmin" placeholder="Ex: pizzaria-do-joao">
-      <label style="margin-top:12px;"><input type="checkbox" id="chkTeste7diasAdmin" style="width:auto; margin-right:6px;">Período de teste de 7 dias</label>
+      <label style="margin-top:12px;">Data de vencimento do contrato (opcional)</label>
+      <input type="date" id="inpVencimentoAdmin">
+      <div class="row" style="margin-top:6px;">
+        <button type="button" class="btn-small" onclick="definirVencimentoRapido('Admin', 7)">+7 dias</button>
+        <button type="button" class="btn-small" onclick="definirVencimentoRapido('Admin', 30)">+1 mês</button>
+        <button type="button" class="btn-small" onclick="definirVencimentoRapido('Admin', 365)">+1 ano</button>
+      </div>
+      <div class="hint">Deixe em branco pra acesso permanente.</div>
       <button class="btn-primary" onclick="criarTenant('Admin')">Criar empresa</button>
       <h2 class="section-title">Empresas cadastradas</h2>
       <div id="adminTenantList"></div>
@@ -812,7 +826,7 @@
 </script>
 
 <script>
-const APP_VERSION = "2026-09-17-08";
+const APP_VERSION = "2026-09-17-09";
 const urlParams = new URLSearchParams(window.location.search);
 let tenantId = (urlParams.get('loja') || '').trim().toLowerCase().replace(/[^a-z0-9-]/g,'') || null;
 const isDevMode = urlParams.get('dev') === '1';
@@ -1953,15 +1967,13 @@ async function renderDevPanel(){
     const base = location.origin + location.pathname;
     box.innerHTML = lista.map(t=>{
       const link = `${base}?loja=${t.id}`;
-      let testeInfo = '';
+      let vencInfo = '';
       if(t.trialEnd){
-        const diffMs = t.trialEnd - Date.now();
-        if(diffMs <= 0){
-          testeInfo = '<span class="status-pill pill-busy">⏰ Teste vencido</span>';
-        } else {
-          const dias = Math.ceil(diffMs / (24*60*60*1000));
-          testeInfo = `<span class="status-pill pill-cor-amarelo">🕐 Teste: ${dias} dia${dias>1?'s':''}</span>`;
-        }
+        const d = new Date(t.trialEnd);
+        const dataFmt = `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+        vencInfo = (t.trialEnd - Date.now() <= 0)
+          ? `<span class="status-pill pill-busy">⏰ Venceu em ${dataFmt}</span>`
+          : `<span class="status-pill pill-cor-amarelo">📅 Vence em ${dataFmt}</span>`;
       }
       return `
       <div class="card" style="margin-bottom:10px;">
@@ -1969,9 +1981,10 @@ async function renderDevPanel(){
         <div class="hint" style="margin:4px 0 12px; word-break:break-all;">${link}</div>
         <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
           <span class="status-pill ${t.ativo?'pill-free':'pill-busy'}">${t.ativo?'Ativa':'Suspensa'}</span>
-          ${testeInfo}
+          ${vencInfo}
           <button class="btn-small" onclick="alternarTenantAtivo('${t.id}', ${!!t.ativo})">${t.ativo?'⏸️ Suspender':'✅ Ativar'}</button>
           <button class="btn-small" onclick="copiarLinkTenant('${link}')">🔗 Copiar link</button>
+          <button class="btn-small" onclick="renovarContrato('${t.id}')">📅 ${t.trialEnd ? 'Renovar' : 'Definir vencimento'}</button>
           ${t.trialEnd ? `<button class="btn-small" onclick="tornarPermanente('${t.id}')">♾️ Tornar permanente</button>` : ''}
           <button class="btn-small btn-danger-outline" onclick="excluirTenant('${t.id}', '${escapeHtml(t.nome||t.id).replace(/'/g,"\\'")}')">🗑️ Excluir</button>
         </div>
@@ -1984,6 +1997,17 @@ async function renderDevPanel(){
 async function alternarTenantAtivo(id, atual){
   const fb = await getFirebase();
   await fb.setDoc(fb.doc(fb.db,'tenants', id), {ativo: !atual}, {merge:true});
+  renderDevPanel();
+}
+async function renovarContrato(id){
+  const atual = prompt('Nova data de vencimento (formato AAAA-MM-DD, ex: 2027-09-17):');
+  if(atual===null) return;
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(atual.trim())){ alert('Data inválida. Use o formato AAAA-MM-DD.'); return; }
+  const novoTs = new Date(atual.trim()+'T23:59:59').getTime();
+  if(isNaN(novoTs)){ alert('Data inválida.'); return; }
+  const fb = await getFirebase();
+  await fb.setDoc(fb.doc(fb.db,'tenants', id), {trialEnd: novoTs}, {merge:true});
+  alert('Vencimento atualizado para ' + atual.trim().split('-').reverse().join('/'));
   renderDevPanel();
 }
 async function tornarPermanente(id){
@@ -2074,25 +2098,29 @@ async function excluirTenant(id, nome){
     alert('Erro ao excluir. Tente de novo.');
   }
 }
+function definirVencimentoRapido(sufixo, dias){
+  const d = new Date(Date.now() + dias*24*60*60*1000);
+  const iso = d.toISOString().slice(0,10);
+  document.getElementById('inpVencimento'+sufixo).value = iso;
+}
 async function criarTenant(sufixo){
   const nome = document.getElementById('inpNovaEmpresaNome'+sufixo).value.trim();
   let slug = document.getElementById('inpNovaEmpresaSlug'+sufixo).value.trim().toLowerCase().replace(/[^a-z0-9-]/g,'-');
   if(!nome){ alert('Digite o nome da empresa.'); return; }
   if(!slug){ alert('Digite um identificador pro link (ex: pizzaria-do-joao).'); return; }
-  const chkTeste = document.getElementById('chkTeste7dias'+sufixo);
-  const teste7dias = chkTeste && chkTeste.checked;
+  const dataVencimento = document.getElementById('inpVencimento'+sufixo).value;
   try{
     const fb = await getFirebase();
     const ref = fb.doc(fb.db, 'tenants', slug);
     const existente = await fb.getDoc(ref);
     if(existente.exists()){ alert('Já existe uma empresa com esse identificador. Escolha outro.'); return; }
     const dadosTenant = {nome, ativo:true, criadoEm:Date.now()};
-    if(teste7dias) dadosTenant.trialEnd = Date.now() + 7*24*60*60*1000;
+    if(dataVencimento) dadosTenant.trialEnd = new Date(dataVencimento+'T23:59:59').getTime();
     await fb.setDoc(ref, dadosTenant);
     document.getElementById('inpNovaEmpresaNome'+sufixo).value='';
     document.getElementById('inpNovaEmpresaSlug'+sufixo).value='';
-    if(chkTeste) chkTeste.checked=false;
-    alert('Empresa criada!\nLink: ' + location.origin+location.pathname+'?loja='+slug + (teste7dias ? '\n\nTeste grátis de 7 dias ativado.' : ''));
+    document.getElementById('inpVencimento'+sufixo).value='';
+    alert('Empresa criada!\nLink: ' + location.origin+location.pathname+'?loja='+slug + (dataVencimento ? '\n\nVence em '+dataVencimento.split('-').reverse().join('/') : ''));
     if(sufixo==='Admin') renderAdminPanel(); else renderDevPanel();
   }catch(e){
     alert('Erro ao criar a empresa. Tente de novo.');
