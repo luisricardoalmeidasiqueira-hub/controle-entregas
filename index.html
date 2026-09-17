@@ -732,7 +732,7 @@
 </script>
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
-  import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection, getDocs, enableIndexedDbPersistence } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+  import { getFirestore, doc, getDoc, setDoc, deleteDoc, onSnapshot, collection, getDocs, enableIndexedDbPersistence } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
   import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
 
   const firebaseConfig = {
@@ -757,7 +757,7 @@
 
   onAuthStateChanged(auth, (user)=>{
     if(user){
-      window.firebaseReadyResolve({ db, doc, getDoc, setDoc, onSnapshot, collection, getDocs });
+      window.firebaseReadyResolve({ db, doc, getDoc, setDoc, deleteDoc, onSnapshot, collection, getDocs });
     }
   });
   signInAnonymously(auth).catch((e)=>{
@@ -1796,6 +1796,7 @@ async function renderDevPanel(){
         </div>
         <span class="status-pill ${t.ativo?'pill-free':'pill-busy'}" style="cursor:pointer" onclick="alternarTenantAtivo('${t.id}', ${!!t.ativo})">${t.ativo?'Ativa':'Suspensa'}</span>
         <button class="btn-small" onclick="copiarLinkTenant('${link}')">Copiar link</button>
+        <button class="btn-small btn-danger-outline" onclick="excluirTenant('${t.id}', '${escapeHtml(t.nome||t.id).replace(/'/g,"\\'")}')">Excluir</button>
       </div>`;
     }).join('');
   }catch(e){
@@ -1809,6 +1810,22 @@ async function alternarTenantAtivo(id, atual){
 }
 function copiarLinkTenant(link){
   navigator.clipboard.writeText(link).then(()=>alert('Link copiado!')).catch(()=>alert('Não deu pra copiar automaticamente. Link: '+link));
+}
+async function excluirTenant(id, nome){
+  if(!confirm(`Tem certeza que quer EXCLUIR a empresa "${nome}"?\n\nIsso apaga TODOS os pedidos, entregadores, clientes e configurações dela. Não pode ser desfeito.`)) return;
+  if(!confirm(`Confirmando de novo: excluir "${nome}" para sempre?`)) return;
+  try{
+    const fb = await getFirebase();
+    const chaves = ['clients','motos','orders','pricing','settings','avisos'];
+    for(const k of chaves){
+      try{ await fb.deleteDoc(fb.doc(fb.db,'tenants', id, 'dados', k)); }catch(e){}
+    }
+    await fb.deleteDoc(fb.doc(fb.db,'tenants', id));
+    alert('Empresa excluída.');
+    renderDevPanel();
+  }catch(e){
+    alert('Erro ao excluir. Tente de novo.');
+  }
 }
 async function criarTenant(){
   const nome = document.getElementById('inpNovaEmpresaNome').value.trim();
