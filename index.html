@@ -148,8 +148,8 @@
     text-align:center;
   }
   .btn-small{
-    padding:7px 10px;
-    font-size:12.5px;
+    padding:5px 8px;
+    font-size:11px;
     background:var(--asphalt-2);
     color:var(--text);
     border:1px solid var(--line);
@@ -392,7 +392,12 @@
     </form>
 
     <div id="stepDevPanel" style="display:none; text-align:left;">
-      <h2 class="section-title" style="margin-top:0;">Empresas cadastradas</h2>
+      <button class="trocar-usuario" style="margin-bottom:10px;" onclick="voltarInicio()">← Voltar</button>
+      <h2 class="section-title" style="margin-top:0;">Visão geral do sistema</h2>
+      <div class="card" id="visaoGeralBox"><div class="empty">Carregando…</div></div>
+      <button class="btn-secondary" onclick="renderVisaoGeral()">🔄 Atualizar visão geral</button>
+
+      <h2 class="section-title">Empresas cadastradas</h2>
       <div id="devTenantList"></div>
       <h2 class="section-title">Cadastrar nova empresa</h2>
       <label>Nome da empresa</label>
@@ -426,6 +431,7 @@
     </form>
 
     <div id="stepAdminPanel" style="display:none; text-align:left;">
+      <button class="trocar-usuario" style="margin-bottom:10px;" onclick="voltarInicio()">← Voltar</button>
       <h2 class="section-title" style="margin-top:0;">Cadastrar nova empresa</h2>
       <label>Nome da empresa</label>
       <input type="text" id="inpNovaEmpresaNomeAdmin" placeholder="Ex: Pizzaria do João">
@@ -826,7 +832,7 @@
 </script>
 
 <script>
-const APP_VERSION = "2026-09-17-10";
+const APP_VERSION = "2026-09-17-13";
 const urlParams = new URLSearchParams(window.location.search);
 let tenantId = (urlParams.get('loja') || '').trim().toLowerCase().replace(/[^a-z0-9-]/g,'') || null;
 const isDevMode = urlParams.get('dev') === '1';
@@ -1846,6 +1852,9 @@ async function bootstrap(){
     mostrarStep('stepLojaNaoEncontrada');
   }
 }
+function voltarInicio(){
+  if(tenantId){ mostrarStep('gateStep1'); } else { mostrarStep('stepSemLoja'); }
+}
 function irParaDev(){
   mostrarStep('stepDevPin');
   const salvo = localStorage.getItem('pinDevSalvo');
@@ -1888,8 +1897,68 @@ async function verificarPinDev(){
 }
 async function abrirDevPanel(){
   mostrarStep('stepDevPanel');
+  await renderVisaoGeral();
   await renderDevPanel();
   await renderDevAdminList();
+}
+async function renderVisaoGeral(){
+  const box = document.getElementById('visaoGeralBox');
+  box.innerHTML = '<div class="empty">Carregando…</div>';
+  try{
+    const fb = await getFirebase();
+    const snaps = await fb.getDocs(fb.collection(fb.db, 'tenants'));
+    const tenants = [];
+    snaps.forEach(d=> tenants.push({id:d.id, ...d.data()}));
+
+    let ativas=0, suspensas=0, vencidas=0;
+    let totalPedidos=0, totalEntregadores=0, totalClientes=0;
+    const linhas = [];
+
+    for(const t of tenants){
+      if(!t.ativo) suspensas++;
+      else if(t.trialEnd && t.trialEnd <= Date.now()) vencidas++;
+      else ativas++;
+
+      let nPedidos=0, nEntregadores=0, nClientes=0;
+      try{
+        const [dOrders, dMotos, dClients] = await Promise.all([
+          fb.getDoc(fb.doc(fb.db,'tenants',t.id,'dados','orders')),
+          fb.getDoc(fb.doc(fb.db,'tenants',t.id,'dados','motos')),
+          fb.getDoc(fb.doc(fb.db,'tenants',t.id,'dados','clients')),
+        ]);
+        if(dOrders.exists()) nPedidos = (JSON.parse(dOrders.data().value)||[]).length;
+        if(dMotos.exists()) nEntregadores = (JSON.parse(dMotos.data().value)||[]).length;
+        if(dClients.exists()) nClientes = (JSON.parse(dClients.data().value)||[]).length;
+      }catch(e){ /* empresa ainda sem dados: mantém zerado */ }
+
+      totalPedidos += nPedidos;
+      totalEntregadores += nEntregadores;
+      totalClientes += nClientes;
+      linhas.push({nome:t.nome||t.id, nPedidos, nEntregadores, nClientes});
+    }
+
+    const snapsAdmins = await fb.getDocs(fb.collection(fb.db, 'admins'));
+    let totalAdmins=0;
+    snapsAdmins.forEach(d=>{ if(d.data().ativo!==false) totalAdmins++; });
+
+    box.innerHTML = `
+      <div class="list-row">
+        <div class="info"><b>${tenants.length} empresa${tenants.length!==1?'s':''} no total</b><span>${ativas} ativa${ativas!==1?'s':''} · ${suspensas} suspensa${suspensas!==1?'s':''} · ${vencidas} vencida${vencidas!==1?'s':''}</span></div>
+      </div>
+      <div class="list-row">
+        <div class="info"><b>${totalAdmins} administrador${totalAdmins!==1?'es':''} ativo${totalAdmins!==1?'s':''}</b></div>
+      </div>
+      <div class="list-row">
+        <div class="info"><b>${totalPedidos} pedidos · ${totalEntregadores} entregadores · ${totalClientes} clientes</b><span>Somando todas as empresas</span></div>
+      </div>
+      ${linhas.length>0 ? '<div class="hint" style="margin-top:10px;">Por empresa:</div>' + linhas.map(l=>`
+      <div class="list-row">
+        <div class="info"><b>${escapeHtml(l.nome)}</b><span>${l.nPedidos} pedidos · ${l.nEntregadores} entregadores · ${l.nClientes} clientes</span></div>
+      </div>`).join('') : ''}
+    `;
+  }catch(e){
+    box.innerHTML = '<div class="empty">Erro ao carregar a visão geral. Tente de novo.</div>';
+  }
 }
 let currentAdminId = null;
 async function verificarPinAdmin(){
@@ -1943,9 +2012,9 @@ async function renderAdminPanel(){
       <div class="card" style="margin-bottom:10px;">
         <b>${escapeHtml(t.nome||t.id)}</b>
         <div class="hint" style="margin:4px 0 12px; word-break:break-all;">${link}</div>
-        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+        <div style="display:flex; gap:5px; flex-wrap:wrap; align-items:center;">
           <span class="status-pill ${t.ativo?'pill-free':'pill-busy'}">${t.ativo?'Ativa':'Suspensa'}</span>
-          <button class="btn-small" onclick="copiarLinkTenant('${link}')">🔗 Copiar link</button>
+          <button class="btn-small" onclick="copiarLinkTenant('${link}')">🔗 Link</button>
         </div>
       </div>`;
     }).join('');
@@ -1977,13 +2046,13 @@ async function renderDevPanel(){
       <div class="card" style="margin-bottom:10px;">
         <b>${escapeHtml(t.nome||t.id)}</b>
         <div class="hint" style="margin:4px 0 12px; word-break:break-all;">${link}</div>
-        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+        <div style="display:flex; gap:5px; flex-wrap:wrap; align-items:center;">
           <span class="status-pill ${t.ativo?'pill-free':'pill-busy'}">${t.ativo?'Ativa':'Suspensa'}</span>
           ${vencInfo}
           <button class="btn-small" onclick="alternarTenantAtivo('${t.id}', ${!!t.ativo})">${t.ativo?'⏸️ Suspender':'✅ Ativar'}</button>
-          <button class="btn-small" onclick="copiarLinkTenant('${link}')">🔗 Copiar link</button>
-          <button class="btn-small" onclick="renovarContrato('${t.id}')">📅 ${t.trialEnd ? 'Renovar' : 'Definir vencimento'}</button>
-          ${t.trialEnd ? `<button class="btn-small" onclick="tornarPermanente('${t.id}')">♾️ Tornar permanente</button>` : ''}
+          <button class="btn-small" onclick="copiarLinkTenant('${link}')">🔗 Link</button>
+          <button class="btn-small" onclick="renovarContrato('${t.id}')">📅 ${t.trialEnd ? 'Renovar' : 'Vencimento'}</button>
+          ${t.trialEnd ? `<button class="btn-small" onclick="tornarPermanente('${t.id}')">♾️ Permanente</button>` : ''}
           <button class="btn-small btn-danger-outline" onclick="excluirTenant('${t.id}', '${escapeHtml(t.nome||t.id).replace(/'/g,"\\'")}')">🗑️ Excluir</button>
         </div>
       </div>`;
@@ -2046,7 +2115,7 @@ async function renderDevAdminList(){
       <div class="card" style="margin-bottom:10px;">
         <b>${escapeHtml(a.nome)}</b>
         <div class="hint" style="margin:4px 0 12px;">${a.pinPadrao ? 'Ainda não trocou o PIN inicial' : 'PIN próprio já definido'}</div>
-        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+        <div style="display:flex; gap:5px; flex-wrap:wrap; align-items:center;">
           <span class="status-pill ${a.ativo!==false?'pill-free':'pill-busy'}">${a.ativo!==false?'Ativo':'Revogado'}</span>
           <button class="btn-small" onclick="alternarAdminAtivo('${a.id}', ${a.ativo!==false})">${a.ativo!==false?'⏸️ Revogar':'✅ Reativar'}</button>
           <button class="btn-small" onclick="resetarPinAdmin('${a.id}', '${escapeHtml(a.nome).replace(/'/g,"\\'")}')">🔑 Resetar PIN</button>
