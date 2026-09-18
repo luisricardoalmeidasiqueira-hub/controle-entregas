@@ -759,7 +759,10 @@
       <div class="card">
         <div class="hint" style="margin-top:0;">Pegou uma entrega direto na rua? Lance aqui o endereço e a taxa combinada — já entra na sua lista e conta no seu fechamento.</div>
         <label>Rua / endereço</label>
-        <input type="text" id="inpEntregaPropriaRua" placeholder="Ex: Rua 11, 123 - Bairro">
+        <div class="row">
+          <input type="text" id="inpEntregaPropriaRua" placeholder="Ex: Rua 11, 123 - Bairro" oninput="atualizarPinEntregaPropria()">
+          <a class="btn-secondary" id="btnPinEntregaPropria" style="margin-top:0; flex:0 0 54px; text-align:center; text-decoration:none; opacity:0.4; pointer-events:none;" href="#" target="_blank" rel="noopener">📍</a>
+        </div>
         <label>Valor da taxa (R$)</label>
         <input type="number" id="inpEntregaPropriaTaxa" placeholder="Ex: 6,00" min="0" step="0.5">
         <button class="btn-primary" onclick="registrarEntregaPropria()">Salvar entrega</button>
@@ -829,7 +832,7 @@
 </script>
 
 <script>
-const APP_VERSION = "2026-09-18-01";
+const APP_VERSION = "2026-09-18-02";
 const urlParams = new URLSearchParams(window.location.search);
 let tenantId = (urlParams.get('loja') || '').trim().toLowerCase().replace(/[^a-z0-9-]/g,'') || null;
 const isDevMode = urlParams.get('dev') === '1';
@@ -1338,6 +1341,20 @@ function motoLogout(){
   trocarUsuario();
 }
 
+function atualizarPinEntregaPropria(){
+  const rua = document.getElementById('inpEntregaPropriaRua').value.trim();
+  const pin = document.getElementById('btnPinEntregaPropria');
+  if(rua){
+    pin.href = mapsLink(rua);
+    pin.style.opacity = '1';
+    pin.style.pointerEvents = 'auto';
+  } else {
+    pin.href = '#';
+    pin.style.opacity = '0.4';
+    pin.style.pointerEvents = 'none';
+  }
+}
+
 async function registrarEntregaPropria(){
   const m = motos.find(m=>m.id===currentMotoId);
   if(!m) return;
@@ -1369,6 +1386,7 @@ async function registrarEntregaPropria(){
   await setData('orders', orders, true);
   document.getElementById('inpEntregaPropriaRua').value='';
   document.getElementById('inpEntregaPropriaTaxa').value='';
+  atualizarPinEntregaPropria();
   renderMinhasEntregas(); renderPedidos(); renderFechamento(); renderGanhoMes();
   alert('Entrega registrada! Já aparece em "Minhas entregas" e no seu fechamento.');
 }
