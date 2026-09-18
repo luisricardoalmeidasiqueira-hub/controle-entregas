@@ -735,7 +735,7 @@
     </section>
 
     <footer style="text-align:center; color:var(--text-dim); font-size:11px; padding:24px 10px 10px;">
-      Desenvolvido por Luís Ricardo · Admin: Rodrigo Machado · Todos os direitos reservados
+      Desenvolvido por Luís Ricardo · Administrado por Luís Ricardo e Rodrigo · Direitos autorais de Luís Ricardo
     </footer>
 
   </main>
@@ -826,7 +826,7 @@
 </script>
 
 <script>
-const APP_VERSION = "2026-09-17-09";
+const APP_VERSION = "2026-09-17-10";
 const urlParams = new URLSearchParams(window.location.search);
 let tenantId = (urlParams.get('loja') || '').trim().toLowerCase().replace(/[^a-z0-9-]/g,'') || null;
 const isDevMode = urlParams.get('dev') === '1';
@@ -1594,20 +1594,14 @@ function renderPricing(){
   const box = document.getElementById('pricingList');
   const ordenada = [...pricing].sort((a,b)=>a.kmAte-b.kmAte);
   box.innerHTML = ordenada.map(p=>`
-    <div class="card" style="margin-bottom:10px; padding:12px;">
-      <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
-        <span style="font-size:12.5px; color:var(--text-dim);">até</span>
-        <input type="number" min="0" step="0.5" value="${p.kmAte}" style="flex:0 1 55px;" onchange="updatePricingRow('${p.id}','kmAte',this.value)">
-        <span style="font-size:12.5px; color:var(--text-dim);">km → R$</span>
-        <input type="number" min="0" step="0.5" value="${p.valor}" style="flex:0 1 55px;" onchange="updatePricingRow('${p.id}','valor',this.value)">
-      </div>
-      <div style="display:flex; gap:6px; align-items:center; justify-content:space-between; margin-top:8px;">
-        <div style="display:flex; gap:6px; align-items:center;">
-          <span style="font-size:11.5px; color:var(--text-dim);">Fim de semana R$</span>
-          <input type="number" min="0" step="0.5" value="${p.extraFds||0}" style="flex:0 1 55px;" onchange="updatePricingRow('${p.id}','extraFds',this.value)">
-        </div>
-        <button class="btn-small btn-danger-outline" style="margin:0;" onclick="removePricingRow('${p.id}')">✕ Remover</button>
-      </div>
+    <div style="display:flex; align-items:center; gap:4px; padding:8px 0; border-bottom:1px solid var(--line); flex-wrap:wrap;">
+      <span style="font-size:10.5px; color:var(--text-dim);">até</span>
+      <input type="number" min="0" step="0.5" value="${p.kmAte}" style="width:34px; padding:5px 3px; font-size:12px; text-align:center;" onchange="updatePricingRow('${p.id}','kmAte',this.value)">
+      <span style="font-size:10.5px; color:var(--text-dim);">km R$</span>
+      <input type="number" min="0" step="0.5" value="${p.valor}" style="width:34px; padding:5px 3px; font-size:12px; text-align:center;" onchange="updatePricingRow('${p.id}','valor',this.value)">
+      <span style="font-size:10.5px; color:var(--text-dim);">FDS R$</span>
+      <input type="number" min="0" step="0.5" value="${p.extraFds||0}" style="width:34px; padding:5px 3px; font-size:12px; text-align:center;" onchange="updatePricingRow('${p.id}','extraFds',this.value)">
+      <button class="btn-small btn-danger-outline" style="padding:5px 8px; font-size:12px; margin-left:auto;" onclick="removePricingRow('${p.id}')">🗑️</button>
     </div>
   `).join('');
 }
@@ -1695,6 +1689,9 @@ async function aceitarPedido(id){
 function mapsLink(address){
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
 }
+function wazeLink(address){
+  return `https://waze.com/ul?q=${encodeURIComponent(address)}&navigate=yes`;
+}
 function renderMinhasEntregas(){
   const box = document.getElementById('minhasEntregasList');
   if(!box || !currentMotoId){ return; }
@@ -1717,7 +1714,8 @@ function renderMinhasEntregas(){
         <span>${o.accepted ? 'Aceito às '+fmtDataHora(o.acceptedAt).split(' ')[1] : (late?'ATRASADO':'Aguardando aceite')}</span>
       </div>
       <div class="order-actions">
-        <a class="btn-small" style="text-align:center;" href="${mapsLink(o.address)}" target="_blank" rel="noopener">🗺️ Abrir no Maps</a>
+        <a class="btn-small" style="text-align:center;" href="${mapsLink(o.address)}" target="_blank" rel="noopener">🗺️ Maps</a>
+        <a class="btn-small" style="text-align:center;" href="${wazeLink(o.address)}" target="_blank" rel="noopener">🚗 Waze</a>
         ${!o.accepted
           ? `<button class="btn-small" style="background:var(--signal); color:#1B1F1D;" onclick="aceitarPedido('${o.id}')">Aceitar pedido</button>`
           : `<button class="btn-small" style="background:var(--signal); color:#1B1F1D;" onclick="marcarEntregue('${o.id}')">Marcar entregue</button>`}
