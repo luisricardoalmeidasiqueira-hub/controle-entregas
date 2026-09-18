@@ -393,7 +393,12 @@
 
     <div id="stepDevPanel" style="display:none; text-align:left;">
       <button class="trocar-usuario" style="margin-bottom:10px;" onclick="voltarInicio()">← Voltar</button>
-      <h2 class="section-title" style="margin-top:0;">Visão geral do sistema</h2>
+      <h2 class="section-title" style="margin-top:0;">📖 Guia rápido pra mandar</h2>
+      <div class="card">
+        <div class="hint" style="margin-top:0;">Texto pronto com o passo a passo do Entregador e do Patrão — copia e cola direto no WhatsApp de quem for usar.</div>
+        <button class="btn-secondary" onclick="copiarGuia()">📋 Copiar guia completo</button>
+      </div>
+      <h2 class="section-title">Visão geral do sistema</h2>
       <div class="card" id="visaoGeralBox"><div class="empty">Carregando…</div></div>
       <button class="btn-secondary" onclick="renderVisaoGeral()">🔄 Atualizar visão geral</button>
 
@@ -432,7 +437,12 @@
 
     <div id="stepAdminPanel" style="display:none; text-align:left;">
       <button class="trocar-usuario" style="margin-bottom:10px;" onclick="voltarInicio()">← Voltar</button>
-      <h2 class="section-title" style="margin-top:0;">Cadastrar nova empresa</h2>
+      <h2 class="section-title" style="margin-top:0;">📖 Guia rápido pra mandar</h2>
+      <div class="card">
+        <div class="hint" style="margin-top:0;">Texto pronto com o passo a passo do Entregador e do Patrão — copia e cola direto no WhatsApp de quem for usar.</div>
+        <button class="btn-secondary" onclick="copiarGuia()">📋 Copiar guia completo</button>
+      </div>
+      <h2 class="section-title">Cadastrar nova empresa</h2>
       <label>Nome da empresa</label>
       <input type="text" id="inpNovaEmpresaNomeAdmin" placeholder="Ex: Pizzaria do João">
       <label>Identificador do link (sem espaços)</label>
@@ -833,7 +843,7 @@
 </script>
 
 <script>
-const APP_VERSION = "2026-09-17-16";
+const APP_VERSION = "2026-09-17-17";
 const urlParams = new URLSearchParams(window.location.search);
 let tenantId = (urlParams.get('loja') || '').trim().toLowerCase().replace(/[^a-z0-9-]/g,'') || null;
 const isDevMode = urlParams.get('dev') === '1';
@@ -2163,6 +2173,41 @@ async function excluirAdmin(id, nome){
 }
 function copiarLinkTenant(link){
   navigator.clipboard.writeText(link).then(()=>alert('Link copiado!')).catch(()=>alert('Não deu pra copiar automaticamente. Link: '+link));
+}
+const GUIA_TEXTO = `📦 COMO O ENTREGADOR SE CADASTRA
+
+1. Abra o link que o patrão te mandou, no navegador do celular.
+2. Na tela inicial, toque no botão amarelo "Entregador".
+3. Digite seu número de celular (só números, com DDD) e toque em "Entrar".
+4. Como é a primeira vez, o app vai pedir seu nome e um PIN de 4 números — invente um e decore, é sua senha pessoal.
+5. Pronto! Você já entra no seu painel: dá pra ver "Minhas entregas", marcar Livre/Ocupado, compartilhar localização e ver quanto já ganhou.
+6. Nas próximas vezes: é só abrir o mesmo link e digitar telefone + PIN.
+
+Dica: toque em "Adicionar à Tela de Início" no navegador pra ficar com um ícone salvo, igual um aplicativo.
+
+👔 COMO O PATRÃO USA O APP
+
+Primeiro acesso:
+1. Abra o link da sua empresa.
+2. Toque no botão "Patrão".
+3. Na primeira vez, o PIN inicial é 0000 — o app já pede pra trocar por um PIN só seu.
+
+Cadastrando um entregador:
+- Você cadastra: aba "Entregadores" → "Cadastrar manualmente" (nome e telefone).
+- Ou ele mesmo se cadastra: manda pra ele o link + o passo a passo do Entregador acima.
+
+Lançando um pedido:
+1. Na aba "Novo", preencha nome do cliente, endereço, valores, forma de pagamento.
+2. Escolha o entregador.
+3. Toque em "Salvar pedido".
+
+Fechando conta no fim do dia:
+- Aba "Pedidos" → "Fechamento" → escolha Hoje/Semana/Mês → veja quanto pagar pra cada entregador.
+
+Outras funções: tabela de preços por distância, clientes com cor de fidelidade, exportar tudo em CSV.`;
+
+function copiarGuia(){
+  navigator.clipboard.writeText(GUIA_TEXTO).then(()=>alert('Guia copiado! Agora é só colar no WhatsApp.')).catch(()=>alert('Não deu pra copiar automaticamente.'));
 }
 async function excluirTenant(id, nome){
   if(!confirm(`Tem certeza que quer EXCLUIR a empresa "${nome}"?\n\nIsso apaga TODOS os pedidos, entregadores, clientes e configurações dela. Não pode ser desfeito.`)) return;
