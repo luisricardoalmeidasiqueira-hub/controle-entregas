@@ -358,6 +358,11 @@
 <div id="bannerAtualizacao" style="display:none; position:fixed; top:0; left:0; right:0; z-index:100; background:var(--signal); color:#1B1F1D; text-align:center; padding:12px; font-weight:700; font-size:14px; cursor:pointer;" onclick="atualizarApp()">
   🔄 Nova atualização disponível — toque para atualizar
 </div>
+<div id="bannerInstalarApp" style="display:none; position:fixed; top:0; left:0; right:0; z-index:101; background:var(--ok); color:#0b2b17; text-align:center; padding:12px; font-weight:700; font-size:14px;">
+  📲 Instale o app pra abrir mais rápido —
+  <span style="text-decoration:underline; cursor:pointer;" onclick="instalarAppAgora()">Instalar agora</span>
+  <span style="float:right; padding:0 4px 0 10px; cursor:pointer;" onclick="document.getElementById('bannerInstalarApp').style.display='none'">✕</span>
+</div>
 <div id="roleGate">
   <div class="gate-inner">
     <h1>Controle de Entregas</h1>
@@ -763,6 +768,10 @@
           <input type="text" id="inpEntregaPropriaRua" placeholder="Ex: Rua 11, 123 - Bairro" oninput="atualizarPinEntregaPropria()">
           <a class="btn-secondary" id="btnPinEntregaPropria" style="margin-top:0; flex:0 0 54px; text-align:center; text-decoration:none; opacity:0.4; pointer-events:none;" href="#" target="_blank" rel="noopener">📍</a>
         </div>
+        <div style="border-radius:10px; overflow:hidden; border:1px solid var(--line); margin-top:8px; height:170px;">
+          <iframe id="mapaEntregaPropria" title="Mapa da entrega" width="100%" height="170" style="border:0; display:block;" loading="lazy" src="https://www.google.com/maps?q=Tatu%C3%AD%2C%20SP&output=embed"></iframe>
+        </div>
+        <div class="hint" style="margin-top:6px;">O mapa mostra a cidade de Tatuí até você digitar o endereço da entrega.</div>
         <label>Valor da taxa (R$)</label>
         <input type="number" id="inpEntregaPropriaTaxa" placeholder="Ex: 6,00" min="0" step="0.5">
         <button class="btn-primary" onclick="registrarEntregaPropria()">Salvar entrega</button>
@@ -832,7 +841,7 @@
 </script>
 
 <script>
-const APP_VERSION = "2026-09-18-03";
+const APP_VERSION = "2026-09-18-04";
 const urlParams = new URLSearchParams(window.location.search);
 let tenantId = (urlParams.get('loja') || '').trim().toLowerCase().replace(/[^a-z0-9-]/g,'') || null;
 const isDevMode = urlParams.get('dev') === '1';
@@ -1344,14 +1353,17 @@ function motoLogout(){
 function atualizarPinEntregaPropria(){
   const rua = document.getElementById('inpEntregaPropriaRua').value.trim();
   const pin = document.getElementById('btnPinEntregaPropria');
+  const mapa = document.getElementById('mapaEntregaPropria');
   if(rua){
     pin.href = mapsLink(rua);
     pin.style.opacity = '1';
     pin.style.pointerEvents = 'auto';
+    mapa.src = 'https://www.google.com/maps?q=' + encodeURIComponent(rua) + '&output=embed';
   } else {
     pin.href = '#';
     pin.style.opacity = '0.4';
     pin.style.pointerEvents = 'none';
+    mapa.src = 'https://www.google.com/maps?q=Tatu%C3%AD%2C%20SP&output=embed';
   }
 }
 
@@ -1539,6 +1551,7 @@ function renderPedidos(){
             <span>${o.accepted ? '✅ Aceito' : '⏳ Aguardando aceite'} · ${late? 'ATRASADO' : 'no prazo'}</span>
           </div>
           <div class="order-actions">
+            <button class="btn-small" onclick="editarEnderecoPedido('${o.id}')">✏️</button>
             <a class="btn-small" style="text-align:center;" href="${mapsLink(o.address)}" target="_blank" rel="noopener">🗺️ Maps</a>
             <a class="btn-whatsapp" style="margin-top:0;" href="${waLink(o)}" target="_blank" rel="noopener">Enviar no WhatsApp</a>
             <button class="btn-small" style="background:var(--signal); color:#1B1F1D;" onclick="marcarEntregue('${o.id}')">Entregue</button>
@@ -1769,6 +1782,7 @@ function renderMinhasEntregas(){
         <span>${o.lancadoPeloEntregador ? 'Registrada por você' : (o.accepted ? 'Aceito às '+fmtDataHora(o.acceptedAt).split(' ')[1] : (late?'ATRASADO':'Aguardando aceite'))}</span>
       </div>
       <div class="order-actions">
+        <button class="btn-small" onclick="editarEnderecoPedido('${o.id}')">✏️ Corrigir</button>
         <a class="btn-small" style="text-align:center;" href="${mapsLink(o.address)}" target="_blank" rel="noopener">🗺️ Maps</a>
         <a class="btn-small" style="text-align:center;" href="${wazeLink(o.address)}" target="_blank" rel="noopener">🚗 Waze</a>
         ${!o.accepted
@@ -1777,6 +1791,19 @@ function renderMinhasEntregas(){
       </div>
     </div>`;
   }).join('');
+}
+
+async function editarEnderecoPedido(id){
+  const o = orders.find(o=>o.id===id);
+  if(!o) return;
+  const novo = prompt('Corrigir rua/endereço desta entrega:', o.address);
+  if(novo === null) return;
+  const endereco = novo.trim();
+  if(!endereco){ alert('O endereço não pode ficar vazio.'); return; }
+  o.address = endereco;
+  await setData('orders', orders, true);
+  renderMinhasEntregas(); renderPedidos(); renderGanhoMes();
+  alert('Endereço corrigido.');
 }
 let periodoMoto = 'hoje';
 function mudarPeriodoMoto(p){
@@ -1811,7 +1838,15 @@ function renderGanhoMes(){
   const taxaValor = (settings.taxaDiariaAtiva ? (settings.taxaDiariaValor||0) : 0);
   const taxaTotal = taxaValor * dias;
   const totalPagar = totalEntregas + taxaTotal;
-  box.innerHTML = `<div class="list-row"><div class="info"><b>${periodo.length} entrega${periodo.length!==1?'s':''} · ${dias} dia${dias>1?'s':''} trabalhado${dias>1?'s':''}</b><span>${taxaTotal>0 ? 'entregas R$ '+totalEntregas.toFixed(2)+' + diárias R$ '+taxaTotal.toFixed(2) : 'Total em entregas'}</span></div><span class="status-pill pill-onTime">R$ ${totalPagar.toFixed(2)}</span></div>`;
+  const listaRuas = [...periodo].sort((a,b)=>b.createdAt-a.createdAt).map(o=>`
+    <div class="list-row">
+      <div class="info">
+        <b>${escapeHtml(o.address)}</b>
+        <span>${fmtDataHora(o.createdAt)}${o.status==='entregue_atrasado' ? ' · atrasado' : ''}</span>
+      </div>
+      <span class="status-pill pill-onTime">R$ ${(o.valorEntrega||0).toFixed(2)}</span>
+    </div>`).join('');
+  box.innerHTML = `<div class="list-row"><div class="info"><b>${periodo.length} entrega${periodo.length!==1?'s':''} · ${dias} dia${dias>1?'s':''} trabalhado${dias>1?'s':''}</b><span>${taxaTotal>0 ? 'entregas R$ '+totalEntregas.toFixed(2)+' + diárias R$ '+taxaTotal.toFixed(2) : 'Total em entregas'}</span></div><span class="status-pill pill-onTime">R$ ${totalPagar.toFixed(2)}</span></div>` + listaRuas;
 }
 
 function renderRanking(){
@@ -2353,6 +2388,27 @@ if('serviceWorker' in navigator){
     navigator.serviceWorker.register('sw.js').catch(()=>{ /* sem suporte ou bloqueado: app continua funcionando normalmente */ });
   });
 }
+
+// ---------- AVISO AUTOMÁTICO PRA INSTALAR O APP ----------
+// No Android/Chrome, se o site cumprir os requisitos de instalação, o navegador dispara
+// esse evento sozinho — geralmente logo ao abrir o link. No iPhone (Safari) isso não existe,
+// então lá o banner nunca aparece (é uma limitação do próprio iOS, não do app).
+let promptInstalacaoPendente = null;
+window.addEventListener('beforeinstallprompt', (e)=>{
+  e.preventDefault();
+  promptInstalacaoPendente = e;
+  document.getElementById('bannerInstalarApp').style.display = 'block';
+});
+async function instalarAppAgora(){
+  if(!promptInstalacaoPendente) return;
+  promptInstalacaoPendente.prompt();
+  await promptInstalacaoPendente.userChoice;
+  promptInstalacaoPendente = null;
+  document.getElementById('bannerInstalarApp').style.display = 'none';
+}
+window.addEventListener('appinstalled', ()=>{
+  document.getElementById('bannerInstalarApp').style.display = 'none';
+});
 </script>
 </body>
 </html>
