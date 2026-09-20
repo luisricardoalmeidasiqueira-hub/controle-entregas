@@ -428,6 +428,13 @@
         <button class="btn-primary" style="margin-top:10px;" onclick="baixarBackup()">💾 Baixar backup de todas as empresas</button>
       </div>
 
+      <h2 class="section-title">Acompanhar o Firebase</h2>
+      <div class="card">
+        <div class="hint" style="margin-top:0;">O uso do banco (leituras, gravações e custo) só aparece no console do Firebase. Use os atalhos abaixo. Aqui na "Visão geral" você já vê o espaço usado e a última atividade de cada empresa.</div>
+        <a class="btn-secondary" style="display:block; text-align:center; text-decoration:none; padding:12px 14px; border-radius:9px; font-size:15px; font-weight:700; margin-top:10px;" href="https://console.firebase.google.com/project/controle-entregas-b0069/firestore" target="_blank" rel="noopener">🔥 Abrir o banco no Firebase (aba Uso)</a>
+        <a class="btn-secondary" style="display:block; text-align:center; text-decoration:none; padding:12px 14px; border-radius:9px; font-size:15px; font-weight:700;" href="https://console.cloud.google.com/billing" target="_blank" rel="noopener">💰 Faturamento e alertas de custo (Google Cloud)</a>
+      </div>
+
       <h2 class="section-title">Empresas cadastradas</h2>
       <div id="devTenantList"></div>
       <h2 class="section-title">Cadastrar nova empresa</h2>
@@ -2092,22 +2099,36 @@ async function renderVisaoGeral(){
       else if(t.trialEnd && t.trialEnd <= Date.now()) vencidas++;
       else ativas++;
 
-      let nPedidos=0, nEntregadores=0, nClientes=0;
+      let nPedidos=0, nEntregadores=0, nClientes=0, maiorTam=0, ultimoTs=0;
       try{
         const [dOrders, dMotos, dClients] = await Promise.all([
           fb.getDoc(fb.doc(fb.db,'tenants',t.id,'dados','orders')),
           fb.getDoc(fb.doc(fb.db,'tenants',t.id,'dados','motos')),
           fb.getDoc(fb.doc(fb.db,'tenants',t.id,'dados','clients')),
         ]);
-        if(dOrders.exists()) nPedidos = (JSON.parse(dOrders.data().value)||[]).length;
-        if(dMotos.exists()) nEntregadores = (JSON.parse(dMotos.data().value)||[]).length;
-        if(dClients.exists()) nClientes = (JSON.parse(dClients.data().value)||[]).length;
+        if(dOrders.exists()){
+          const txt = dOrders.data().value;
+          const lista = JSON.parse(txt)||[];
+          nPedidos = lista.length;
+          maiorTam = Math.max(maiorTam, (txt||'').length);
+          lista.forEach(o=>{ ultimoTs = Math.max(ultimoTs, o.createdAt||0, o.deliveredAt||0); });
+        }
+        if(dMotos.exists()){
+          const txt = dMotos.data().value;
+          nEntregadores = (JSON.parse(txt)||[]).length;
+          maiorTam = Math.max(maiorTam, (txt||'').length);
+        }
+        if(dClients.exists()){
+          const txt = dClients.data().value;
+          nClientes = (JSON.parse(txt)||[]).length;
+          maiorTam = Math.max(maiorTam, (txt||'').length);
+        }
       }catch(e){ /* empresa ainda sem dados: mantém zerado */ }
 
       totalPedidos += nPedidos;
       totalEntregadores += nEntregadores;
       totalClientes += nClientes;
-      linhas.push({nome:t.nome||t.id, nPedidos, nEntregadores, nClientes});
+      linhas.push({nome:t.nome||t.id, nPedidos, nEntregadores, nClientes, maiorTam, ultimoTs});
     }
 
     const snapsAdmins = await fb.getDocs(fb.collection(fb.db, 'admins'));
@@ -2126,7 +2147,7 @@ async function renderVisaoGeral(){
       </div>
       ${linhas.length>0 ? '<div class="hint" style="margin-top:10px;">Por empresa:</div>' + linhas.map(l=>`
       <div class="list-row">
-        <div class="info"><b>${escapeHtml(l.nome)}</b><span>${l.nPedidos} pedidos · ${l.nEntregadores} entregadores · ${l.nClientes} clientes</span></div>
+        <div class="info"><b>${escapeHtml(l.nome)}</b><span>${l.nPedidos} pedidos · ${l.nEntregadores} entregadores · ${l.nClientes} clientes<br>${textoEspaco(l.maiorTam)} · última atividade: ${textoTempoAtras(l.ultimoTs)}</span></div>
       </div>`).join('') : ''}
     `;
   }catch(e){
@@ -2263,6 +2284,26 @@ async function tornarPermanente(id){
   await fb.setDoc(fb.doc(fb.db,'tenants', id), {trialEnd: null}, {merge:true});
   alert('Empresa agora tem acesso permanente.');
   renderDevPanel();
+}
+
+// ---------- ESPAÇO USADO E ÚLTIMA ATIVIDADE (Visão geral) ----------
+// Cada bloco de dados de uma empresa (pedidos, entregadores, clientes) é um único documento no banco,
+// e as regras do Firestore aceitam até 900.000 caracteres por bloco. Esse é o "espaço" mostrado.
+const LIMITE_BLOCO_CHARS = 900000;
+function textoTempoAtras(ts){
+  if(!ts) return 'nenhuma ainda';
+  const min = Math.floor((Date.now()-ts)/60000);
+  if(min < 1) return 'agora mesmo';
+  if(min < 60) return `há ${min} min`;
+  const h = Math.floor(min/60);
+  if(h < 48) return `há ${h} h`;
+  return `há ${Math.floor(h/24)} dias`;
+}
+function textoEspaco(tam){
+  const pct = Math.min(100, Math.round(((tam||0) / LIMITE_BLOCO_CHARS) * 100));
+  if(pct >= 90) return `<span style="color:var(--late); font-weight:700;">espaço ${pct}% ⚠️ quase cheio</span>`;
+  if(pct >= 70) return `<span style="color:var(--signal); font-weight:700;">espaço ${pct}% ⚠️ atenção</span>`;
+  return `espaço ${pct}%`;
 }
 
 // ---------- BACKUP E PIN DO PATRÃO (painel do Desenvolvedor) ----------
