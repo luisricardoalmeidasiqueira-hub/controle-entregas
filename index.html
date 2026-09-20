@@ -407,6 +407,11 @@
       <label>PIN do Desenvolvedor</label>
       <input type="password" inputmode="numeric" id="inpDevPin" autocomplete="off" maxlength="4" placeholder="••••">
       <label style="margin-top:10px;"><input type="checkbox" id="chkLembrarDev" style="width:auto; margin-right:6px;">Lembrar neste aparelho</label>
+      <div id="bioDevWrap" style="display:none;">
+        <label style="margin-top:10px;"><input type="checkbox" id="chkBioDev" style="width:auto; margin-right:6px;">🔐 Exigir Face ID / digital para entrar neste aparelho</label>
+        <button type="button" class="btn-secondary" id="btnBioDev" style="display:none;" onclick="entrarComBiometria('dev')">🔓 Entrar com Face ID / digital</button>
+        <button type="button" class="trocar-usuario" id="btnBioDevOff" style="display:none; margin-top:10px;" onclick="desativarBiometria('dev')">Desativar Face ID neste aparelho</button>
+      </div>
       <button class="btn-primary" type="submit">Entrar</button>
     </form>
 
@@ -468,6 +473,11 @@
       <label>PIN do Administrador</label>
       <input type="password" inputmode="numeric" id="inpAdminPin" autocomplete="off" maxlength="4" placeholder="••••">
       <label style="margin-top:10px;"><input type="checkbox" id="chkLembrarAdmin" style="width:auto; margin-right:6px;">Lembrar neste aparelho</label>
+      <div id="bioAdminWrap" style="display:none;">
+        <label style="margin-top:10px;"><input type="checkbox" id="chkBioAdmin" style="width:auto; margin-right:6px;">🔐 Exigir Face ID / digital para entrar neste aparelho</label>
+        <button type="button" class="btn-secondary" id="btnBioAdmin" style="display:none;" onclick="entrarComBiometria('admin')">🔓 Entrar com Face ID / digital</button>
+        <button type="button" class="trocar-usuario" id="btnBioAdminOff" style="display:none; margin-top:10px;" onclick="desativarBiometria('admin')">Desativar Face ID neste aparelho</button>
+      </div>
       <button class="btn-primary" type="submit">Entrar</button>
     </form>
 
@@ -2037,14 +2047,117 @@ function voltarInicio(){
 function irParaDev(){
   mostrarStep('stepDevPin');
   const salvo = localStorage.getItem('pinDevSalvo');
-  if(salvo){ document.getElementById('inpDevPin').value = salvo; document.getElementById('chkLembrarDev').checked = true; }
+  if(salvo && !localStorage.getItem('bioDevId')){ document.getElementById('inpDevPin').value = salvo; document.getElementById('chkLembrarDev').checked = true; }
+  prepararBiometria('dev');
 }
 function irParaAdmin(){
   mostrarStep('stepAdminPin');
   const salvo = localStorage.getItem('pinAdminSalvo');
-  if(salvo){ document.getElementById('inpAdminPin').value = salvo; document.getElementById('chkLembrarAdmin').checked = true; }
+  if(salvo && !localStorage.getItem('bioAdminId')){ document.getElementById('inpAdminPin').value = salvo; document.getElementById('chkLembrarAdmin').checked = true; }
+  prepararBiometria('admin');
 }
 bootstrap();
+
+// ---------- FACE ID / DIGITAL (trava neste aparelho, para Desenvolvedor e Administrador) ----------
+// Usa o recurso de "chave de acesso" (WebAuthn) do próprio celular. Serve como trava de conveniência:
+// com ela ativa, o PIN salvo só é liberado depois de reconhecer o seu rosto ou digital.
+// Não há verificação no servidor; a proteção real dos dados continua sendo as regras do Firebase.
+function bioConfig(qual){ // função (e não constante) porque a tela de PIN já pode abrir antes deste trecho carregar
+  return ({
+    dev:   {id:'bioDevId',   pin:'pinDevSalvo',   chk:'chkBioDev',   wrap:'bioDevWrap',   btn:'btnBioDev',   off:'btnBioDevOff',   inp:'inpDevPin',   nome:'desenvolvedor'},
+    admin: {id:'bioAdminId', pin:'pinAdminSalvo', chk:'chkBioAdmin', wrap:'bioAdminWrap', btn:'btnBioAdmin', off:'btnBioAdminOff', inp:'inpAdminPin', nome:'administrador'}
+  })[qual];
+}
+function bioParaTexto(buf){
+  let s = '';
+  new Uint8Array(buf).forEach(b=>{ s += String.fromCharCode(b); });
+  return btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+}
+function bioParaBytes(str){
+  str = str.replace(/-/g,'+').replace(/_/g,'/');
+  while(str.length % 4) str += '=';
+  const bin = atob(str);
+  const out = new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+async function biometriaDisponivel(){
+  try{
+    return !!(window.PublicKeyCredential
+      && PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable
+      && await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable());
+  }catch(e){ return false; }
+}
+async function prepararBiometria(qual){
+  const c = bioConfig(qual);
+  const wrap = document.getElementById(c.wrap);
+  if(!wrap) return;
+  if(!(await biometriaDisponivel())){ wrap.style.display = 'none'; return; }
+  wrap.style.display = 'block';
+  const ativo = !!(localStorage.getItem(c.id) && localStorage.getItem(c.pin));
+  document.getElementById(c.chk).checked = ativo;
+  document.getElementById(c.btn).style.display = ativo ? 'block' : 'none';
+  document.getElementById(c.off).style.display = ativo ? 'inline' : 'none';
+  if(ativo) document.getElementById(c.inp).value = '';
+}
+async function registrarCredencial(qual){
+  const c = bioConfig(qual);
+  const cred = await navigator.credentials.create({publicKey:{
+    challenge: crypto.getRandomValues(new Uint8Array(32)),
+    rp: {name:'Controle de Entregas'},
+    user: {id: crypto.getRandomValues(new Uint8Array(16)), name: c.nome, displayName: c.nome.charAt(0).toUpperCase()+c.nome.slice(1)},
+    pubKeyCredParams: [{type:'public-key', alg:-7}, {type:'public-key', alg:-257}],
+    authenticatorSelection: {authenticatorAttachment:'platform', userVerification:'required', residentKey:'preferred'},
+    attestation: 'none',
+    timeout: 60000
+  }});
+  localStorage.setItem(c.id, bioParaTexto(cred.rawId));
+}
+async function aplicarBiometria(qual, pin){
+  const c = bioConfig(qual);
+  const chk = document.getElementById(c.chk);
+  const wrap = document.getElementById(c.wrap);
+  if(!chk || !wrap || wrap.style.display === 'none') return; // aparelho sem Face ID / digital
+  if(chk.checked){
+    if(!localStorage.getItem(c.id)){
+      try{ await registrarCredencial(qual); }
+      catch(e){
+        chk.checked = false;
+        localStorage.removeItem(c.id);
+        alert('Não foi possível ativar o Face ID / digital neste aparelho. Você pode continuar entrando com o PIN.');
+        return;
+      }
+      alert('Face ID / digital ativado neste aparelho.');
+    }
+    localStorage.setItem(c.pin, pin);
+  } else {
+    localStorage.removeItem(c.id);
+  }
+}
+async function entrarComBiometria(qual){
+  const c = bioConfig(qual);
+  const idSalvo = localStorage.getItem(c.id);
+  const pin = localStorage.getItem(c.pin);
+  if(!idSalvo || !pin){ alert('O Face ID / digital não está ativo. Entre com o PIN.'); return; }
+  try{
+    await navigator.credentials.get({publicKey:{
+      challenge: crypto.getRandomValues(new Uint8Array(32)),
+      allowCredentials: [{type:'public-key', id: bioParaBytes(idSalvo), transports:['internal']}],
+      userVerification: 'required',
+      timeout: 60000
+    }});
+  }catch(e){ return; } // cancelou ou não reconheceu: segue sem entrar
+  document.getElementById(c.inp).value = pin;
+  if(qual === 'dev') verificarPinDev(); else verificarPinAdmin();
+}
+function desativarBiometria(qual){
+  const c = bioConfig(qual);
+  localStorage.removeItem(c.id);
+  localStorage.removeItem(c.pin);
+  document.getElementById(c.inp).value = '';
+  prepararBiometria(qual);
+  alert('Face ID / digital desativado neste aparelho. Entre com o PIN.');
+}
 
 // ---------- PAINEL DO DESENVOLVEDOR ----------
 async function verificarPinDev(){
@@ -2070,6 +2183,7 @@ async function verificarPinDev(){
     } else {
       localStorage.removeItem('pinDevSalvo');
     }
+    await aplicarBiometria('dev', devPin);
     abrirDevPanel();
   }catch(e){
     alert('Não foi possível verificar o PIN agora. Confira sua conexão e tente de novo.');
@@ -2181,6 +2295,7 @@ async function verificarPinAdmin(){
     } else {
       localStorage.removeItem('pinAdminSalvo');
     }
+    await aplicarBiometria('admin', encontrado.pin);
     abrirAdminPanel();
   }catch(e){
     alert('Não foi possível verificar o PIN agora. Confira sua conexão e tente de novo.');
@@ -2539,7 +2654,7 @@ window.addEventListener('appinstalled', ()=>{
   var BASE = location.origin + location.pathname;
   var PARAMS = new URLSearchParams(location.search);
   var SESS_KEY = 'cdSessaoPainel';
-  var SESS_TTL = 12 * 60 * 60 * 1000; // 12 horas
+  var SESS_TTL = 2 * 60 * 60 * 1000; // 2 horas
   var demoAtivo = PARAMS.get('demo') === '1';
   var comoParam = PARAMS.get('as'); // 'patrao' | 'moto'
   var motoParam = PARAMS.get('moto');
@@ -2557,7 +2672,7 @@ window.addEventListener('appinstalled', ()=>{
     window[nome] = fabrica(orig);
   }
 
-  /* ---------- sessão do painel (só nesta aba, 12 h) ---------- */
+  /* ---------- sessão do painel (só nesta aba, 2 h) ---------- */
   function lerSessao() {
     try {
       var s = JSON.parse(sessionStorage.getItem(SESS_KEY) || 'null');
@@ -2635,7 +2750,7 @@ window.addEventListener('appinstalled', ()=>{
     }
   }
   function voltarPainel() {
-    location.href = BASE + '?' + (sessao && sessao.role === 'admin' ? 'admin=1' : 'dev=1');
+    location.href = BASE + '?' + (sessao && sessao.role === 'admin' ? 'admin=1' : 'dev=1') + '&volta=1';
   }
 
   /* ---------- abrir o app como Patrão / Entregador ---------- */
@@ -2977,8 +3092,9 @@ window.addEventListener('appinstalled', ()=>{
       jaEntrou = true;
       entrarPreview();
     }
-  } else if (sessao) {
-    // Voltando de uma empresa para o painel: não pede o PIN de novo (mesma aba, até 12 h).
+  } else if (sessao && PARAMS.get('volta') === '1') {
+    // Voltando de uma empresa para o painel (botão "← Painel"): não pede o PIN de novo (mesma aba, até 2 h).
+    // Abrir ?dev=1 ou ?admin=1 diretamente continua pedindo o PIN (ou o Face ID).
     if (typeof isDevMode !== 'undefined' && isDevMode && sessao.role === 'dev') window.abrirDevPanel();
     else if (typeof isAdminMode !== 'undefined' && isAdminMode && sessao.role === 'admin') window.abrirAdminPanel();
   }
