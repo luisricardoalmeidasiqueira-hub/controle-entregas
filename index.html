@@ -841,7 +841,7 @@
 </script>
 
 <script>
-const APP_VERSION = "2026-09-18-06";
+const APP_VERSION = "2026-09-18-07";
 const urlParams = new URLSearchParams(window.location.search);
 let tenantId = (urlParams.get('loja') || '').trim().toLowerCase().replace(/[^a-z0-9-]/g,'') || null;
 const isDevMode = urlParams.get('dev') === '1';
@@ -2390,11 +2390,13 @@ function atualizarApp(){
 checarNovaVersao();
 setInterval(checarNovaVersao, 3*60*1000);
 
-// Registra o service worker (necessário pro Chrome liberar a instalação completa no Android)
+// Service worker DESATIVADO por segurança: uma versão anterior dele chegou a interferir
+// nas chamadas do Firebase (PIN não verificava). Removendo qualquer versão instalada
+// no aparelho, pra garantir que o app volte a funcionar 100% mesmo sem a instalação completa.
 if('serviceWorker' in navigator){
-  window.addEventListener('load', ()=>{
-    navigator.serviceWorker.register('sw.js').catch(()=>{ /* sem suporte ou bloqueado: app continua funcionando normalmente */ });
-  });
+  navigator.serviceWorker.getRegistrations().then(regs=>{
+    regs.forEach(reg=>reg.unregister());
+  }).catch(()=>{});
 }
 
 // ---------- AVISO AUTOMÁTICO PRA INSTALAR O APP ----------
