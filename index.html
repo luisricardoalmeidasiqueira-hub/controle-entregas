@@ -852,7 +852,7 @@
 </script>
 
 <script>
-const APP_VERSION = "2026-09-18-11";
+const APP_VERSION = "2026-09-18-12";
 const urlParams = new URLSearchParams(window.location.search);
 let tenantId = (urlParams.get('loja') || '').trim().toLowerCase().replace(/[^a-z0-9-]/g,'') || null;
 const isDevMode = urlParams.get('dev') === '1';
@@ -1833,9 +1833,18 @@ function renderMinhasEntregas(){
         ${!o.accepted
           ? `<button class="btn-small" style="background:var(--signal); color:#1B1F1D;" onclick="aceitarPedido('${o.id}')">Aceitar pedido</button>`
           : `<button class="btn-small" style="background:var(--signal); color:#1B1F1D;" onclick="marcarEntregue('${o.id}')">Marcar entregue</button>`}
+        ${o.lancadoPeloEntregador ? `<button class="btn-small" style="border-color:var(--late); color:var(--late);" onclick="excluirEntregaPropria('${o.id}')">🗑️ Excluir</button>` : ''}
       </div>
     </div>`;
   }).join('');
+}
+async function excluirEntregaPropria(id){
+  const o = orders.find(o=>o.id===id);
+  if(!o) return;
+  if(!confirm('Excluir esta entrega registrada por você? Essa ação não pode ser desfeita.')) return;
+  orders = orders.filter(x=>x.id!==id);
+  await setData('orders', orders, true);
+  renderMinhasEntregas(); renderGanhoMes();
 }
 
 async function editarEnderecoPedido(id){
