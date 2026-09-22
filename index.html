@@ -806,6 +806,7 @@
 </script>
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
+  import { initializeAppCheck, ReCaptchaEnterpriseProvider } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app-check.js";
   import { getFirestore, doc, getDoc, setDoc, deleteDoc, onSnapshot, collection, getDocs, enableIndexedDbPersistence } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
   import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
 
@@ -823,6 +824,18 @@
   window.PIN_INICIAL_ADMIN = "000000";
 
   const app = initializeApp(firebaseConfig);
+
+  // App Check: garante que só este app (rodando no domínio cadastrado) consegue
+  // acessar o Firestore de verdade, mesmo que alguém copie o código.
+  try{
+    initializeAppCheck(app, {
+      provider: new ReCaptchaEnterpriseProvider('6Le_08ktAAAAADKhLugsd_eXShXjwn2wTrSqkRDH'),
+      isTokenAutoRefreshEnabled: true
+    });
+  }catch(e){
+    console.error('Falha ao iniciar o App Check — o app continua funcionando normalmente, só sem essa camada extra de proteção.', e);
+  }
+
   const db = getFirestore(app);
   const auth = getAuth(app);
 
@@ -839,7 +852,7 @@
 </script>
 
 <script>
-const APP_VERSION = "2026-09-18-10";
+const APP_VERSION = "2026-09-18-11";
 const urlParams = new URLSearchParams(window.location.search);
 let tenantId = (urlParams.get('loja') || '').trim().toLowerCase().replace(/[^a-z0-9-]/g,'') || null;
 const isDevMode = urlParams.get('dev') === '1';
