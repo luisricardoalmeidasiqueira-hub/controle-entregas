@@ -841,7 +841,7 @@
 </script>
 
 <script>
-const APP_VERSION = "2026-09-18-07";
+const APP_VERSION = "2026-09-18-08";
 const urlParams = new URLSearchParams(window.location.search);
 let tenantId = (urlParams.get('loja') || '').trim().toLowerCase().replace(/[^a-z0-9-]/g,'') || null;
 const isDevMode = urlParams.get('dev') === '1';
@@ -2054,7 +2054,8 @@ async function verificarPinDev(){
     }
     abrirDevPanel();
   }catch(e){
-    alert('Não foi possível verificar o PIN agora. Confira sua conexão e tente de novo.');
+    console.error('Falha ao verificar PIN de Desenvolvedor:', e);
+    alert('Não foi possível verificar o PIN agora.\n\nDetalhe técnico: ' + (e && (e.code || e.message) ? (e.code || '') + ' ' + (e.message || '') : 'erro desconhecido') + '\n\nConfira sua conexão e tente de novo.');
   }
 }
 async function abrirDevPanel(){
@@ -2151,7 +2152,8 @@ async function verificarPinAdmin(){
     }
     abrirAdminPanel();
   }catch(e){
-    alert('Não foi possível verificar o PIN agora. Confira sua conexão e tente de novo.');
+    console.error('Falha ao verificar PIN de Administrador:', e);
+    alert('Não foi possível verificar o PIN agora.\n\nDetalhe técnico: ' + (e && (e.code || e.message) ? (e.code || '') + ' ' + (e.message || '') : 'erro desconhecido') + '\n\nConfira sua conexão e tente de novo.');
   }
 }
 async function abrirAdminPanel(){
