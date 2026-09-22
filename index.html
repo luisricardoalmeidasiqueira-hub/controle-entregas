@@ -427,8 +427,7 @@
       <h2 class="section-title">Cadastrar nova empresa</h2>
       <label>Nome da empresa</label>
       <input type="text" id="inpNovaEmpresaNome" placeholder="Ex: Pizzaria do João">
-      <label>Identificador do link (sem espaços)</label>
-      <input type="text" id="inpNovaEmpresaSlug" placeholder="Ex: pizzaria-do-joao">
+      <div class="hint" style="margin-top:0;">O link e o PIN do Patrão são gerados automaticamente, de forma aleatória, pra dificultar alguém adivinhar ou clonar.</div>
       <label style="margin-top:12px;">Data de vencimento do contrato (opcional)</label>
       <input type="date" id="inpVencimento">
       <div class="row" style="margin-top:6px;">
@@ -466,8 +465,7 @@
       <h2 class="section-title">Cadastrar nova empresa</h2>
       <label>Nome da empresa</label>
       <input type="text" id="inpNovaEmpresaNomeAdmin" placeholder="Ex: Pizzaria do João">
-      <label>Identificador do link (sem espaços)</label>
-      <input type="text" id="inpNovaEmpresaSlugAdmin" placeholder="Ex: pizzaria-do-joao">
+      <div class="hint" style="margin-top:0;">O link e o PIN do Patrão são gerados automaticamente, de forma aleatória, pra dificultar alguém adivinhar ou clonar.</div>
       <label style="margin-top:12px;">Data de vencimento do contrato (opcional)</label>
       <input type="date" id="inpVencimentoAdmin">
       <div class="row" style="margin-top:6px;">
@@ -841,7 +839,7 @@
 </script>
 
 <script>
-const APP_VERSION = "2026-09-18-08";
+const APP_VERSION = "2026-09-18-09";
 const urlParams = new URLSearchParams(window.location.search);
 let tenantId = (urlParams.get('loja') || '').trim().toLowerCase().replace(/[^a-z0-9-]/g,'') || null;
 const isDevMode = urlParams.get('dev') === '1';
@@ -2348,24 +2346,52 @@ function definirVencimentoRapido(sufixo, dias){
   const iso = d.toISOString().slice(0,10);
   document.getElementById('inpVencimento'+sufixo).value = iso;
 }
+function gerarSlugAleatorio(tamanho){
+  const chars = 'abcdefghjkmnpqrstuvwxyz23456789';
+  let out = '';
+  if(window.crypto && window.crypto.getRandomValues){
+    const arr = new Uint32Array(tamanho);
+    window.crypto.getRandomValues(arr);
+    for(let i=0;i<tamanho;i++) out += chars[arr[i] % chars.length];
+  } else {
+    for(let i=0;i<tamanho;i++) out += chars[Math.floor(Math.random()*chars.length)];
+  }
+  return out;
+}
+function gerarPinAleatorio(){
+  let n;
+  if(window.crypto && window.crypto.getRandomValues){
+    const arr = new Uint32Array(1);
+    window.crypto.getRandomValues(arr);
+    n = arr[0] % 10000;
+  } else {
+    n = Math.floor(Math.random()*10000);
+  }
+  return String(n).padStart(4,'0');
+}
 async function criarTenant(sufixo){
   const nome = document.getElementById('inpNovaEmpresaNome'+sufixo).value.trim();
-  let slug = document.getElementById('inpNovaEmpresaSlug'+sufixo).value.trim().toLowerCase().replace(/[^a-z0-9-]/g,'-');
   if(!nome){ alert('Digite o nome da empresa.'); return; }
-  if(!slug){ alert('Digite um identificador pro link (ex: pizzaria-do-joao).'); return; }
   const dataVencimento = document.getElementById('inpVencimento'+sufixo).value;
   try{
     const fb = await getFirebase();
-    const ref = fb.doc(fb.db, 'tenants', slug);
-    const existente = await fb.getDoc(ref);
-    if(existente.exists()){ alert('Já existe uma empresa com esse identificador. Escolha outro.'); return; }
+    let slug, ref, existente;
+    for(let tentativa=0; tentativa<5; tentativa++){
+      slug = gerarSlugAleatorio(8);
+      ref = fb.doc(fb.db, 'tenants', slug);
+      existente = await fb.getDoc(ref);
+      if(!existente.exists()) break;
+    }
+    if(existente.exists()){ alert('Não consegui gerar um link único agora. Tenta de novo.'); return; }
     const dadosTenant = {nome, ativo:true, criadoEm:Date.now()};
     if(dataVencimento) dadosTenant.trialEnd = new Date(dataVencimento+'T23:59:59').getTime();
     await fb.setDoc(ref, dadosTenant);
+    const pinPatrao = gerarPinAleatorio();
+    await fb.setDoc(fb.doc(fb.db, 'tenants', slug, 'dados', 'settings'), {value: JSON.stringify({patraoPin: pinPatrao, taxaDiariaAtiva:false, taxaDiariaValor:40, taxaUrgenteAtiva:false, taxaUrgenteValor:5})});
     document.getElementById('inpNovaEmpresaNome'+sufixo).value='';
-    document.getElementById('inpNovaEmpresaSlug'+sufixo).value='';
     document.getElementById('inpVencimento'+sufixo).value='';
-    alert('Empresa criada!\nLink: ' + location.origin+location.pathname+'?loja='+slug + (dataVencimento ? '\n\nVence em '+dataVencimento.split('-').reverse().join('/') : ''));
+    const link = location.origin+location.pathname+'?loja='+slug;
+    alert('Empresa criada!\n\nLink: ' + link + '\n\nPIN do Patrão: ' + pinPatrao + '\n\nGuarde esse PIN e passe pro dono da empresa junto com o link -- ele pode trocar por um PIN proprio depois, em "Trocar meu PIN".' + (dataVencimento ? '\n\nVence em '+dataVencimento.split('-').reverse().join('/') : ''));
     if(sufixo==='Admin') renderAdminPanel(); else renderDevPanel();
   }catch(e){
     alert('Erro ao criar a empresa. Tente de novo.');
