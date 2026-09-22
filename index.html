@@ -405,7 +405,7 @@
 
     <form id="stepDevPin" style="display:none;" onsubmit="event.preventDefault(); verificarPinDev();" autocomplete="off">
       <label>PIN do Desenvolvedor</label>
-      <input type="password" inputmode="numeric" id="inpDevPin" autocomplete="off" maxlength="4" placeholder="••••">
+      <input type="password" inputmode="numeric" id="inpDevPin" autocomplete="off" maxlength="6" placeholder="••••••">
       <label style="margin-top:10px;"><input type="checkbox" id="chkLembrarDev" style="width:auto; margin-right:6px;">Lembrar neste aparelho</label>
       <button class="btn-primary" type="submit">Entrar</button>
     </form>
@@ -449,7 +449,7 @@
 
     <form id="stepAdminPin" style="display:none;" onsubmit="event.preventDefault(); verificarPinAdmin();" autocomplete="off">
       <label>PIN do Administrador</label>
-      <input type="password" inputmode="numeric" id="inpAdminPin" autocomplete="off" maxlength="4" placeholder="••••">
+      <input type="password" inputmode="numeric" id="inpAdminPin" autocomplete="off" maxlength="6" placeholder="••••••">
       <label style="margin-top:10px;"><input type="checkbox" id="chkLembrarAdmin" style="width:auto; margin-right:6px;">Lembrar neste aparelho</label>
       <button class="btn-primary" type="submit">Entrar</button>
     </form>
@@ -819,8 +819,8 @@
   };
 
   window.PIN_INICIAL_PATRAO = "0000";
-  window.PIN_INICIAL_DEV = "0000";
-  window.PIN_INICIAL_ADMIN = "0000";
+  window.PIN_INICIAL_DEV = "000000";
+  window.PIN_INICIAL_ADMIN = "000000";
 
   const app = initializeApp(firebaseConfig);
   const db = getFirestore(app);
@@ -839,7 +839,7 @@
 </script>
 
 <script>
-const APP_VERSION = "2026-09-18-09";
+const APP_VERSION = "2026-09-18-10";
 const urlParams = new URLSearchParams(window.location.search);
 let tenantId = (urlParams.get('loja') || '').trim().toLowerCase().replace(/[^a-z0-9-]/g,'') || null;
 const isDevMode = urlParams.get('dev') === '1';
@@ -1023,8 +1023,10 @@ async function trocarPinPatrao(){
 async function continuarGatePatrao(){
   await dataReadyPromise;
   if(settings.patraoPin){
+    if(checarBloqueioPin('patrao_'+tenantId)) return;
     const digitado = document.getElementById('inpPatraoPin').value.trim();
-    if(digitado !== settings.patraoPin){ alert('PIN incorreto.'); document.getElementById('inpPatraoPin').value=''; return; }
+    if(digitado !== settings.patraoPin){ registrarErroPin('patrao_'+tenantId); alert('PIN incorreto.'); document.getElementById('inpPatraoPin').value=''; return; }
+    limparTentativasPin('patrao_'+tenantId);
     entrarComoPatrao();
   } else {
     const novoPin = document.getElementById('inpPatraoNovoPin').value.trim();
@@ -1072,8 +1074,10 @@ async function continuarGateMotoboy(){
       pinWrap.style.display='block';
       return;
     }
+    if(checarBloqueioPin('entregador_'+tenantId+'_'+digits)) return;
     const digitado = document.getElementById('inpGatePin').value.trim();
-    if(digitado !== m.pin){ alert('PIN incorreto. Tente de novo.'); document.getElementById('inpGatePin').value=''; return; }
+    if(digitado !== m.pin){ registrarErroPin('entregador_'+tenantId+'_'+digits); alert('PIN incorreto. Tente de novo.'); document.getElementById('inpGatePin').value=''; return; }
+    limparTentativasPin('entregador_'+tenantId+'_'+digits);
     m.updatedAt = Date.now();
   } else {
     m.updatedAt = Date.now();
@@ -1100,6 +1104,36 @@ function trocarUsuario(){
 }
 
 function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+
+// ---------- BLOQUEIO POR TENTATIVAS ERRADAS DE PIN ----------
+const MAX_TENTATIVAS_PIN = 5;
+const BLOQUEIO_MINUTOS = 5;
+function lerTentativas(chave){
+  try{ return JSON.parse(localStorage.getItem('tentativas_'+chave)) || {erros:0, bloqueadoAte:0}; }
+  catch(e){ return {erros:0, bloqueadoAte:0}; }
+}
+function checarBloqueioPin(chave){
+  const dados = lerTentativas(chave);
+  if(dados.bloqueadoAte && Date.now() < dados.bloqueadoAte){
+    const minutos = Math.ceil((dados.bloqueadoAte - Date.now())/60000);
+    alert(`Muitas tentativas erradas de PIN. Aguarde ${minutos} minuto${minutos!==1?'s':''} e tente de novo.`);
+    return true;
+  }
+  return false;
+}
+function registrarErroPin(chave){
+  const dados = lerTentativas(chave);
+  dados.erros = (dados.erros||0) + 1;
+  if(dados.erros >= MAX_TENTATIVAS_PIN){
+    dados.bloqueadoAte = Date.now() + BLOQUEIO_MINUTOS*60000;
+    dados.erros = 0;
+    alert(`Muitas tentativas erradas de PIN. Bloqueado por ${BLOQUEIO_MINUTOS} minutos.`);
+  }
+  localStorage.setItem('tentativas_'+chave, JSON.stringify(dados));
+}
+function limparTentativasPin(chave){
+  localStorage.removeItem('tentativas_'+chave);
+}
 function fmtPhoneDigits(p){ return (p||'').replace(/\D/g,''); }
 function pad2(n){ return n.toString().padStart(2,'0'); }
 function setDataPedidoAgora(){
@@ -2035,14 +2069,16 @@ async function verificarPinDev(){
     const snap = await fb.getDoc(ref);
     let devPin = snap.exists() ? snap.data().devPin : null;
     if(!devPin){
-      devPin = (window.PIN_INICIAL_DEV && /^\d{4}$/.test(window.PIN_INICIAL_DEV)) ? window.PIN_INICIAL_DEV : '0000';
+      devPin = (window.PIN_INICIAL_DEV && /^\d{6}$/.test(window.PIN_INICIAL_DEV)) ? window.PIN_INICIAL_DEV : '000000';
       await fb.setDoc(ref, {devPin});
     }
+    if(checarBloqueioPin('dev')) return;
     const digitado = document.getElementById('inpDevPin').value.trim();
-    if(digitado !== devPin){ alert('PIN incorreto.'); document.getElementById('inpDevPin').value=''; return; }
-    if(devPin === '0000'){
-      let novo = prompt('Este é o PIN padrão de fábrica. Crie agora um PIN de 4 números só seu, de Desenvolvedor:');
-      while(novo!==null && !/^\d{4}$/.test(novo)){ novo = prompt('PIN inválido. Digite exatamente 4 números:'); }
+    if(digitado !== devPin){ registrarErroPin('dev'); alert('PIN incorreto.'); document.getElementById('inpDevPin').value=''; return; }
+    limparTentativasPin('dev');
+    if(devPin === '000000' || devPin.length < 6){
+      let novo = prompt('Crie agora um PIN de 6 números só seu, de Desenvolvedor:');
+      while(novo!==null && !/^\d{6}$/.test(novo)){ novo = prompt('PIN inválido. Digite exatamente 6 números:'); }
       if(novo!==null){ await fb.setDoc(ref, {devPin:novo}); alert('PIN de Desenvolvedor atualizado!'); devPin = novo; }
     }
     if(document.getElementById('chkLembrarDev').checked){
@@ -2125,6 +2161,7 @@ let currentAdminId = null;
 async function verificarPinAdmin(){
   try{
     const fb = await getFirebase();
+    if(checarBloqueioPin('admin')) return;
     const digitado = document.getElementById('inpAdminPin').value.trim();
     const snaps = await fb.getDocs(fb.collection(fb.db, 'admins'));
     let encontrado = null;
@@ -2132,11 +2169,12 @@ async function verificarPinAdmin(){
       const data = d.data();
       if(data.pin === digitado && data.ativo !== false){ encontrado = {id:d.id, ...data}; }
     });
-    if(!encontrado){ alert('PIN incorreto ou acesso revogado.'); document.getElementById('inpAdminPin').value=''; return; }
+    if(!encontrado){ registrarErroPin('admin'); alert('PIN incorreto ou acesso revogado.'); document.getElementById('inpAdminPin').value=''; return; }
+    limparTentativasPin('admin');
     currentAdminId = encontrado.id;
-    if(encontrado.pinPadrao){
-      let novo = prompt('Este é o seu PIN inicial. Crie agora um PIN de 4 números só seu:');
-      while(novo!==null && !/^\d{4}$/.test(novo)){ novo = prompt('PIN inválido. Digite exatamente 4 números:'); }
+    if(encontrado.pinPadrao || (encontrado.pin && encontrado.pin.length < 6)){
+      let novo = prompt('Crie agora um PIN de 6 números só seu:');
+      while(novo!==null && !/^\d{6}$/.test(novo)){ novo = prompt('PIN inválido. Digite exatamente 6 números:'); }
       if(novo!==null){
         await fb.setDoc(fb.doc(fb.db,'admins', encontrado.id), {pin:novo, pinPadrao:false}, {merge:true});
         alert('PIN atualizado!');
