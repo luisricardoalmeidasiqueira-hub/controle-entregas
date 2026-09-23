@@ -389,6 +389,32 @@
       <p>⚠️ Não encontramos essa empresa.<br>Confira se o link está certo, ou peça um novo link pra quem administra.</p>
     </div>
 
+    <div id="stepPrivacidade" style="display:none; text-align:left;">
+      <h2 class="section-title" style="margin-top:0;">🔒 Aviso de Privacidade (LGPD)</h2>
+      <div class="card" style="font-size:13px; line-height:1.7; color:var(--text-dim);">
+        <h3 style="margin-top:0; font-size:15px; color:var(--text);">Quais dados este app guarda</h3>
+        <p><b>De clientes:</b> nome, telefone e endereço de entrega.<br>
+        <b>De entregadores:</b> nome, telefone, PIN de acesso, placa do veículo (se informada) e localização (GPS), só quando o próprio entregador escolhe compartilhar.<br>
+        <b>De pedidos:</b> dados do pedido, valores e horários, ligados ao cliente e ao entregador acima.</p>
+
+        <h3 style="font-size:15px; color:var(--text);">Por que esses dados são coletados</h3>
+        <p>Só pra operar o serviço de entregas: montar o pedido, decidir qual entregador atende, calcular o pagamento e mostrar o endereço no mapa. Nenhum dado é usado pra outra finalidade, nem vendido ou compartilhado com terceiros fora da empresa.</p>
+
+        <h3 style="font-size:15px; color:var(--text);">Onde os dados ficam guardados</h3>
+        <p>Os dados ficam no Firebase (Google Cloud), com acesso protegido por PIN individual, bloqueio automático após tentativas erradas e uma camada extra (Firebase App Check) que impede acesso por fora do app. Como o Firebase é uma infraestrutura do Google, os dados podem ser processados em servidores fora do Brasil, dentro das garantias de proteção do próprio Google.</p>
+
+        <h3 style="font-size:15px; color:var(--text);">Por quanto tempo</h3>
+        <p>Enquanto a empresa estiver usando o sistema. Pedidos já entregues ficam guardados como histórico financeiro do negócio, mesmo que o cliente ou entregador peça exclusão do cadastro — só os dados pessoais vinculados ao cadastro ativo são removidos.</p>
+
+        <h3 style="font-size:15px; color:var(--text);">Seus direitos</h3>
+        <p>Você pode pedir a qualquer momento pra ver, corrigir ou excluir seus dados. Entregadores têm um botão de exclusão direto no próprio painel ("Excluir meus dados"). Clientes podem pedir a exclusão ao Patrão da empresa, que remove o cadastro na aba Clientes.</p>
+
+        <h3 style="font-size:15px; color:var(--text);">Localização (GPS)</h3>
+        <p>A localização do entregador só é coletada se ele tocar em "Compartilhar minha localização", depois de ler uma explicação na hora. Ela é usada só pra mostrar a região dele pro Patrão da mesma empresa, e pode parar de ser compartilhada quando o entregador quiser.</p>
+      </div>
+      <button class="btn-secondary" onclick="voltarInicio()">Voltar</button>
+    </div>
+
     <div id="stepAjuda" style="display:none; text-align:left;">
       <h2 class="section-title" style="margin-top:0;">📖 Como usar o Controle de Entregas</h2>
       <div class="card">
@@ -399,6 +425,7 @@
         <h3 style="margin-top:0; font-size:15px;">👔 Se você é Patrão</h3>
         <div id="guiaPatraoTexto" style="white-space:pre-line; font-size:13px; line-height:1.6; color:var(--text-dim);"></div>
       </div>
+      <div class="hint" style="text-align:center; margin-top:14px;"><a href="?privacidade=1" style="color:var(--text-dim);">🔒 Aviso de Privacidade (LGPD)</a></div>
       <button class="btn-primary" onclick="compartilharLinkAjuda()">📤 Compartilhar este guia</button>
       <div class="hint" style="text-align:center; margin-top:14px;">Chegou aqui e queria acessar o sistema? Peça o link certo pra quem administra a sua empresa.</div>
     </div>
@@ -483,6 +510,7 @@
       <p>Quem está usando o app agora?</p>
       <button class="btn-primary" onclick="escolherPapel('patrao')">Patrão</button>
       <button class="btn-secondary" onclick="escolherPapel('motoboy')">Entregador</button>
+      <div class="hint" style="text-align:center; margin-top:14px;"><a href="?privacidade=1" target="_blank" style="color:var(--text-dim);">🔒 Aviso de Privacidade (LGPD)</a></div>
     </div>
     <div id="gateStep2" style="display:none;">
       <label>Seu telefone</label>
@@ -757,6 +785,7 @@
           <button class="btn-secondary" style="margin-top:0;" onclick="avisarProblema('Moto com problema')">🔧 Moto</button>
         </div>
         <button class="btn-secondary" style="margin-top:18px; border-color:var(--late); color:var(--late);" onclick="motoLogout()">Sair</button>
+        <button class="btn-secondary" style="margin-top:10px; border-color:var(--late); color:var(--late);" onclick="excluirMeusDados()">🗑️ Excluir meus dados (LGPD)</button>
       </div>
 
       <h2 class="section-title">Registrar entrega própria</h2>
@@ -789,7 +818,8 @@
     </section>
 
     <footer style="text-align:center; color:var(--text-dim); font-size:11px; padding:24px 10px 10px;">
-      Desenvolvido por Luís Ricardo · Administrado por Luís Ricardo e Rodrigo · Direitos autorais de Luís Ricardo · © 2026 Todos os direitos reservados
+      Desenvolvido por Luís Ricardo · Administrado por Luís Ricardo e Rodrigo · Direitos autorais de Luís Ricardo · © 2026 Todos os direitos reservados<br>
+      <a href="?privacidade=1" target="_blank" style="color:var(--text-dim);">🔒 Aviso de Privacidade (LGPD)</a>
     </footer>
 
   </main>
@@ -853,12 +883,13 @@
 </script>
 
 <script>
-const APP_VERSION = "2026-09-18-14";
+const APP_VERSION = "2026-09-18-15";
 const urlParams = new URLSearchParams(window.location.search);
 let tenantId = (urlParams.get('loja') || '').trim().toLowerCase().replace(/[^a-z0-9-]/g,'') || null;
 const isDevMode = urlParams.get('dev') === '1';
 const isAdminMode = urlParams.get('admin') === '1';
 const isAjudaMode = urlParams.get('ajuda') === '1';
+const isPrivacidadeMode = urlParams.get('privacidade') === '1';
 
 let clients = [];
 let motos = [];
@@ -1395,12 +1426,15 @@ function compartilharLocalizacao(){
     hint.textContent = 'Este navegador não permite compartilhar localização automática. Use o campo de zona/referência acima.';
     return;
   }
+  const aceitou = confirm('Sua localização (GPS) vai ser usada só pra mostrar em qual região você está pro patrão, facilitando a distribuição das entregas. Ela fica visível só dentro da sua empresa, não é compartilhada com mais ninguém, e você pode parar de compartilhar quando quiser.\n\nQuer continuar?');
+  if(!aceitou) return;
   hint.textContent = 'Obtendo localização…';
   navigator.geolocation.getCurrentPosition(async pos=>{
     const m = motos.find(m=>m.id===currentMotoId);
     if(!m) return;
     m.lat = pos.coords.latitude;
     m.lng = pos.coords.longitude;
+    m.consentimentoLocalizacao = Date.now();
     m.updatedAt = Date.now();
     await setData('motos', motos, true);
     hint.textContent = 'Localização compartilhada com sucesso.';
@@ -1410,6 +1444,17 @@ function compartilharLocalizacao(){
   }, {enableHighAccuracy:true, timeout:8000});
 }
 function motoLogout(){
+  trocarUsuario();
+}
+async function excluirMeusDados(){
+  const m = motos.find(m=>m.id===currentMotoId);
+  if(!m) return;
+  if(!confirm('Isso vai apagar seu cadastro (nome, telefone, PIN e localização) deste sistema. Entregas já registradas continuam guardadas como histórico do negócio, sem esses dados vinculados a um cadastro ativo.\n\nVocê será desconectado. Confirma a exclusão?')) return;
+  motos = motos.filter(x=>x.id!==currentMotoId);
+  await setData('motos', motos, true);
+  localStorage.removeItem('motoTelSalvo_'+tenantId);
+  localStorage.removeItem('motoPinSalvo_'+tenantId);
+  alert('Seu cadastro foi excluído.');
   trocarUsuario();
 }
 
@@ -2039,7 +2084,7 @@ function copiarGuia(){
 
 // ---------- RESOLUÇÃO DE EMPRESA / MODO DESENVOLVEDOR ----------
 function mostrarStep(id){
-  ['gateStep1','gateStep2','gateStep3','stepCarregando','stepSemLoja','stepLojaSuspensa','stepTesteVencido','stepLojaNaoEncontrada','stepAjuda','stepDevPin','stepDevPanel','stepAdminPin','stepAdminPanel'].forEach(s=>{
+  ['gateStep1','gateStep2','gateStep3','stepCarregando','stepSemLoja','stepLojaSuspensa','stepTesteVencido','stepLojaNaoEncontrada','stepAjuda','stepPrivacidade','stepDevPin','stepDevPanel','stepAdminPin','stepAdminPanel'].forEach(s=>{
     const el = document.getElementById(s);
     if(el) el.style.display = (s===id) ? 'block' : 'none';
   });
@@ -2047,6 +2092,10 @@ function mostrarStep(id){
 
 async function bootstrap(){
   mostrarStep('stepCarregando');
+  if(isPrivacidadeMode){
+    mostrarStep('stepPrivacidade');
+    return;
+  }
   if(isAjudaMode){
     preencherGuiaAjuda();
     mostrarStep('stepAjuda');
