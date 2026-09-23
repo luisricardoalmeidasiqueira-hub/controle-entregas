@@ -439,6 +439,7 @@
 
     <div id="stepDevPanel" style="display:none; text-align:left;">
       <button class="trocar-usuario" style="margin-bottom:10px;" onclick="voltarInicio()">← Voltar</button>
+      <button class="trocar-usuario" style="margin-bottom:10px;" onclick="atualizarApp()">🔄 Atualizar aplicativo</button>
       <h2 class="section-title" style="margin-top:0;">📖 Guia rápido pra mandar</h2>
       <div class="card">
         <div class="hint" style="margin-top:0;">Link com o guia completo (Entregador e Patrão) — funciona pra qualquer pessoa, sem precisar de PIN.</div>
@@ -483,6 +484,7 @@
 
     <div id="stepAdminPanel" style="display:none; text-align:left;">
       <button class="trocar-usuario" style="margin-bottom:10px;" onclick="voltarInicio()">← Voltar</button>
+      <button class="trocar-usuario" style="margin-bottom:10px;" onclick="atualizarApp()">🔄 Atualizar aplicativo</button>
       <h2 class="section-title" style="margin-top:0;">📖 Guia rápido pra mandar</h2>
       <div class="card">
         <div class="hint" style="margin-top:0;">Link com o guia completo (Entregador e Patrão) — funciona pra qualquer pessoa, sem precisar de PIN.</div>
@@ -552,9 +554,10 @@
       <span class="badge" id="activeCount">0 ativos</span>
     </div>
     <div class="conn" id="connIndicator"><span class="dot"></span><span id="connText">Verificando conexão…</span></div>
-    <div style="display:flex; gap:14px;">
+    <div style="display:flex; gap:14px; flex-wrap:wrap;">
       <button class="trocar-usuario" onclick="trocarUsuario()">Trocar usuário</button>
       <button class="trocar-usuario" id="btnTrocarPin" style="display:none;" onclick="trocarPinPatrao()">Trocar meu PIN</button>
+      <button class="trocar-usuario" onclick="atualizarApp()">🔄 Atualizar aplicativo</button>
     </div>
   </header>
 
@@ -883,7 +886,7 @@
 </script>
 
 <script>
-const APP_VERSION = "2026-09-18-15";
+const APP_VERSION = "2026-09-18-16";
 const urlParams = new URLSearchParams(window.location.search);
 let tenantId = (urlParams.get('loja') || '').trim().toLowerCase().replace(/[^a-z0-9-]/g,'') || null;
 const isDevMode = urlParams.get('dev') === '1';
