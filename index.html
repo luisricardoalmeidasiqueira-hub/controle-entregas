@@ -497,6 +497,7 @@
         <label>Seu PIN de 4 números</label>
         <input type="password" inputmode="numeric" id="inpGatePin" maxlength="4" placeholder="••••">
       </div>
+      <label style="margin-top:10px;"><input type="checkbox" id="chkLembrarMoto" style="width:auto; margin-right:6px;" checked>Lembrar neste aparelho</label>
       <button class="btn-primary" onclick="continuarGateMotoboy()">Entrar</button>
       <button class="btn-secondary" onclick="voltarGate()">Voltar</button>
     </div>
@@ -852,7 +853,7 @@
 </script>
 
 <script>
-const APP_VERSION = "2026-09-18-13";
+const APP_VERSION = "2026-09-18-14";
 const urlParams = new URLSearchParams(window.location.search);
 let tenantId = (urlParams.get('loja') || '').trim().toLowerCase().replace(/[^a-z0-9-]/g,'') || null;
 const isDevMode = urlParams.get('dev') === '1';
@@ -1001,6 +1002,15 @@ async function escolherPapel(papel){
   } else {
     document.getElementById('gateStep1').style.display='none';
     document.getElementById('gateStep2').style.display='block';
+    const salvoTel = localStorage.getItem('motoTelSalvo_'+tenantId);
+    const salvoPin = localStorage.getItem('motoPinSalvo_'+tenantId);
+    if(salvoTel){
+      document.getElementById('inpGatePhone').value = salvoTel;
+      if(salvoPin){
+        document.getElementById('gatePinWrap').style.display='block';
+        document.getElementById('inpGatePin').value = salvoPin;
+      }
+    }
   }
 }
 function entrarComoPatrao(){
@@ -1094,6 +1104,14 @@ async function continuarGateMotoboy(){
     m.updatedAt = Date.now();
   } else {
     m.updatedAt = Date.now();
+  }
+  const lembrarMoto = document.getElementById('chkLembrarMoto') && document.getElementById('chkLembrarMoto').checked;
+  if(lembrarMoto){
+    localStorage.setItem('motoTelSalvo_'+tenantId, phone);
+    if(m.pin) localStorage.setItem('motoPinSalvo_'+tenantId, m.pin);
+  } else {
+    localStorage.removeItem('motoTelSalvo_'+tenantId);
+    localStorage.removeItem('motoPinSalvo_'+tenantId);
   }
   await setData('motos', motos, true);
   appRole = 'motoboy';
